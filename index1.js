@@ -1,7 +1,6 @@
 import { ApolloServer } from '@apollo/server';
 import { startStandaloneServer } from '@apollo/server/standalone';
 import db from './_db.js';
-//types
 import { typeDefs } from './schema.js';
 
 const resolvers = {
@@ -19,17 +18,51 @@ const resolvers = {
       return db.books.find((book) => book.id === args.id);
     },
   },
-  //   Book: {
-  //     reviews(parent) {
-  //       return db.reviews.filter((r) => r.game_id === parent.id);
-  //     },
-  //   },
   Collection: {
     books(parent) {
       return db.books.filter((book) => book.collection_id === parent.id);
     },
     bookQuantity(parent) {
       return parent.books.length;
+    },
+  },
+  Mutation: {
+    addBookToCollection: (_, { collectionId, book }) => {
+      const collection = db.collections.find((c) => c.id === collectionId);
+
+      if (!collection) {
+        throw new Error(`Collection with ID ${collectionId} not found`);
+      }
+
+      const newBook = {
+        id: String(db.books.length + 1),
+        ...book,
+        collection_id: collectionId,
+      };
+
+      collection.books.push(newBook);
+
+      db.books.push(newBook);
+
+      return newBook;
+    },
+
+    addCollection: (_, { collection }) => {
+      if (!collection || !collection.collection || collection.collection.trim() === '') {
+        throw new Error('Collection title is required');
+      }
+      console.log(db.collections.length);
+      const newCollection = {
+        id: String(db.collections.length + 1),
+        ...collection,
+        bookQuantity: 0,
+        books: [],
+      };
+      console.log('New Collection:', newCollection);
+
+      db.collections.push(newCollection);
+
+      return newCollection;
     },
   },
 };
