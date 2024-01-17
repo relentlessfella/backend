@@ -2,67 +2,102 @@ import { ApolloServer } from '@apollo/server';
 import { startStandaloneServer } from '@apollo/server/standalone';
 import db from './_db.js';
 import { typeDefs } from './schema.js';
+import { PrismaClient } from '@prisma/client';
 
+const prisma = new PrismaClient();
+
+// Resolvers define how to fetch the types defined in your schema.
 const resolvers = {
   Query: {
-    bookCollections() {
-      return db.collections;
+    async getCollections() {
+      return await prisma.collection.findMany({
+        orderBy: { id: 'asc' },
+      });
     },
-    bookCollection(_, args) {
-      return db.collections.find((collection) => collection.id === args.id);
+    async bookCollection(_, args, context) {
+      return await prisma.collection.findUnique({
+        where: {
+          id: parseInt(args.id),
+        },
+        include: {
+          Book: {
+            select: {
+              id: true,
+              collection_id: true,
+              title: true,
+              description: true,
+            },
+          },
+        },
+      });
     },
-    books() {
-      return db.books;
+    async books(_, args) {
+      try {
+        const books = await prisma.book.findMany({
+          where: {
+            collection_id: parseInt(args.id),
+          },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            collection_id: true, // Include collection_id in the selection
+          },
+        });
+        return books; // Ensure that 'books' is not null
+      } catch (error) {
+        console.error('Error fetching books:', error);
+        throw new Error('Failed to fetch books'); // or handle the error in an appropriate way
+      }
     },
     book(_, args) {
       return db.books.find((book) => book.id === args.id);
+    },
+    func(parent, args, context, info) {
+      console.log(args.name);
+      console.log(info);
+      return args.name;
     },
   },
   Collection: {
     books(parent) {
       return db.books.filter((book) => book.collection_id === parent.id);
     },
-    bookQuantity(parent) {
-      return parent.books.length;
+    async bookQuantity(parent) {
+      const booksCount = await prisma.book.count({
+        where: {
+          collection_id: parent.id,
+        },
+      });
+      return booksCount;
     },
   },
   Mutation: {
-    addBookToCollection: (_, { collectionId, book }) => {
-      const collection = db.collections.find((c) => c.id === collectionId);
-
-      if (!collection) {
-        throw new Error(`Collection with ID ${collectionId} not found`);
+    async addBookToCollection(_, { collection_id, book }) {
+      if (!book || !book.description || book.title.trim() === '') {
+        throw new Error('All fields are required');
       }
-
-      const newBook = {
-        id: String(db.books.length + 1),
-        ...book,
-        collection_id: collectionId,
-      };
-
-      collection.books.push(newBook);
-
-      db.books.push(newBook);
-
-      return newBook;
+      const addBook = await prisma.book.create({
+        data: {
+          title: book.title,
+          description: book.description,
+          collection_id: parseInt(collection_id),
+        },
+      });
+      return console.log('Adding Book: ', addBook);
     },
 
-    addCollection: (_, { collection }) => {
-      if (!collection || !collection.collection || collection.collection.trim() === '') {
+    addCollection: async (_, { collection }) => {
+      if (!collection || !collection.title || collection.title.trim() === '') {
         throw new Error('Collection title is required');
       }
       console.log(db.collections.length);
-      const newCollection = {
-        id: String(db.collections.length + 1),
-        ...collection,
-        bookQuantity: 0,
-        books: [],
-      };
-      console.log('New Collection:', newCollection);
+      const response = await prisma.collection.create({
+        data: { title: collection.title },
+      });
+      console.log('New Collection:', collection);
 
-      db.collections.push(newCollection);
-
-      return newCollection;
+      return response;
     },
   },
 };
@@ -74,6 +109,9 @@ const server = new ApolloServer({
 
 const { url } = await startStandaloneServer(server, {
   listen: { port: 4000 },
+  context: async () => ({
+    prisma: new PrismaClient(),
+  }),
 });
 
 console.log('Server ready at port', 4000);
