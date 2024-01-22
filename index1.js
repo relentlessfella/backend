@@ -99,6 +99,14 @@ const resolvers = {
 
       return response;
     },
+    deleteBook: async (_, { id }) => {
+      const deleteBook = await prisma.book.delete({
+        where: {
+          id: parseInt(id),
+        },
+      });
+      return console.log(id);
+    },
   },
 };
 

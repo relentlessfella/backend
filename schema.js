@@ -26,6 +26,7 @@ type Query {
 type Mutation {
   addBookToCollection(collection_id: ID!, book: AddBookInput!): Book
   addCollection(collection: AddCollectionInput!): Collection
+  deleteBook(id: ID!): Book
 }
 
 input AddBookInput {
