@@ -1,3 +1,5 @@
+//example data (not used)
+
 let collections = [
   { id: '1', collection: 'collection 1', bookQuantity: 2, books: ['1', '2'] },
   { id: '2', collection: 'collection 2', bookQuantity: 3, books: ['3', '4', '5'] },
